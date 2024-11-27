@@ -3,30 +3,29 @@
 from flask import Flask, render_template, redirect, session, jsonify
 from flask_debugtoolbar import DebugToolbarExtension
 from werkzeug.exceptions import Unauthorized
+from dotenv import load_dotenv
+import os
 
 from models import connect_db, db, User, Feedback
 from forms import RegisterForm, LoginForm, FeedbackForm, DeleteForm
 
 from email_validator import validate_email, EmailNotValidError
 
+# Load environment variables from .env
+load_dotenv()
+
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql:///flask-feedback"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ECHO'] = True
-app.config['SECRET_KEY'] = "shhhhh"
-app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
+# Use environment variables for configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = os.getenv('SQLALCHEMY_TRACK_MODIFICATIONS')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = os.getenv('DEBUG_TB_INTERCEPT_REDIRECTS')
+
 
 toolbar = DebugToolbarExtension(app)
 
 connect_db(app)
-
-
-@app.route("/")
-def homepage():
-    """Homepage of site; redirect to register."""
-
-    return redirect("/register")
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -185,18 +184,42 @@ def delete_feedback(feedback_id):
 
 @app.route('/validate_email', methods=['POST'])
 def validate_email_route():
-    data = request.get_json()
-    email = data.get('email')
-
-    if not email:
-        return jsonify({"error": "Email is required"}), 400
-
     try:
+        data = request.get_json()
+        if not data or 'email' not in data:
+            return jsonify({"error": "Request must include 'email' key in JSON body"}), 400
+
+        email = data['email']
+        if not email:
+            return jsonify({"error": "Email is required"}), 400
+
         # Validate the email
         valid = validate_email(email)
-        return jsonify({"email": valid.email, "status": "Valid"})
+        return jsonify({"email": valid.email, "status": "Valid"}), 200
+
     except EmailNotValidError as e:
-        return jsonify({"email": email, "status": "Invalid", "error": str(e)}), 400
+        return jsonify({"email": data.get('email'), "status": "Invalid", "error": str(e)}), 400
+
+    except Exception as e:
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+
+@app.route("/feedback", methods=["GET"])
+def list_all_feedback():
+    """Display all feedback entries."""
+
+    # Query all feedback entries from the database
+    feedback_list = Feedback.query.all()
+
+    # Render a template to display the feedback entries
+    return render_template("feedback/list.html", feedback=feedback_list)
+
+
+@app.route("/")
+def homepage():
+    """Homepage of site."""
+    return render_template("homepage.html")
+
 
 if __name__ == '__main__':
     app.run(debug=True)

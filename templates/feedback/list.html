@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>All Feedback</h1>
+    <ul>
+        {% for entry in feedback %}
+            <li>
+                <strong>{{ entry.title }}</strong>: {{ entry.content }}
+                <em>by {{ entry.username }}</em>
+            </li>
+        {% else %}
+            <p>No feedback entries found.</p>
+        {% endfor %}
+    </ul>
+    <a href="/">Go back to the homepage</a>
+
+    {% endblock %}
